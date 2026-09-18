@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Caça-Palavras Interativo</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="game-container">
+    <h1>Caça-Palavras - Rodada <span id="fase-num">1</span> de 15</h1>
+    
+    <div class="timer-box">Tempo Restante: <span id="timer">10:00</span></div>
+    <div class="theme-title" id="theme-display">Tema: </div>
+
+    <div class="words-box">
+      <h3>Palavras para encontrar:</h3>
+      <ul id="word-list"></ul>
+    </div>
+
+    <!-- Grelha do Caça-Palavras -->
+    <div id="grid-container"></div>
+    <div class="status-message" id="message"></div>
+  </div>
+
+  <script>
+    // 15 Fases com nomes corrigidos e progressão de 5 a 13 palavras
+    const bancoFases = [
+      { tema: "Comidas Gostosas", palavras: ["PIZZA", "LASANHA", "HAMBURGUER", "BATATA FRITA", "PASTEL"] },
+      { tema: "Super-Heróis", palavras: ["BATMAN", "SUPERMAN", "HOMEM DE FERRO", "CAPITAO AMERICA", "MULHER MARAVILHA", "PANTERA NEGRA"] },
+      { tema: "Filmes de Terror", palavras: ["PANICO", "CHUCKY", "INVOCACAO DO MAL", "O EXORCISTA", "IT A COISA", "O CHAMADO"] },
+      { tema: "Jogos Famosos", palavras: ["SUPER MARIO", "MINECRAFT", "FORTNITE", "GRAND THEFT AUTO", "ZELDA", "ROBLOX", "PAC MAN"] },
+      { tema: "Personagens de Animes", palavras: ["NARUTO", "GOKU", "LUFFY", "TANJIRO", "NEZUKO", "SAITAMA", "SATORU GOJO"] },
+      { tema: "Doces e Sobremesas", palavras: ["CHOCOLATE", "SORVETE", "BRIGADEIRO", "PUDIM", "CHURROS", "BOLO", "TORRONE", "ACAI"] },
+      { tema: "Animes e Mangás", palavras: ["DEMON SLAYER", "ONE PIECE", "NARUTO", "BLEACH", "DRAGON BALL", "ATTACK ON TITAN", "POKEMON", "DEATH NOTE"] },
+      { tema: "Jogos Clássicos e Consolas", palavras: ["NINTENDO", "PLAYSTATION", "XBOX", "ATARI", "SONIC", "TETRIS", "MEGA MAN", "TOP GEAR", "STREET FIGHTER"] },
+      { tema: "Frutas e Saladas", palavras: ["MORANGO", "MELANCIA", "BANANA", "ABACAXI", "MARACUJA", "LARANJA", "UVA", "AMORA", "PITAYA"] },
+      { tema: "Heróis e Vilões Marvel/DC", palavras: ["HOMEM ARANHA", "THOR", "HULK", "THANOS", "BATMAN", "CORINGA", "FLASH", "WOLVERINE", "LOKI", "VENOM"] },
+      { tema: "Comidas de Lanchonete", palavras: ["COXINHA", "EMPADA", "KIBE", "ENROLADINHO", "CROISSANT", "HOT DOG", "PAO DE QUEIJO", "PIZZA", "PASTEL", "HAMBURGUER"] },
+      { tema: "Personagens de Jogos", palavras: ["LUIGI", "BOWSER", "LINK", "ZELDA", "KRATOS", "SONIC", "TAILS", "PIKACHU", "CHARIZARD", "DONKEY KONG", "YOSHI"] },
+      { tema: "Mundo Geek e Pop", palavras: ["STAR WARS", "MATRIX", "AVATAR", "HARRY POTTER", "O HOBBIT", "MARVEL", "DC COMICS", "PIXAR", "DISNEY", "ANIME", "MANGA"] },
+      { tema: "Pratos do Dia a Dia", palavras: ["ARROZ", "FEIJAO", "BIFE", "SALADA", "OVO FRITO", "FAROFA", "PURE DE BATATA", "MACARRAO", "SOPA", "PEIXE", "FRANGO", "PANQUECA"] },
+      { tema: "Super Rodada Final", palavras: ["SUPER MARIO", "LUIGI", "NARUTO", "GOKU", "BATMAN", "HOMEM ARANHA", "PIZZA", "CHOCOLATE", "MINECRAFT", "FORTNITE", "DEMON SLAYER", "POKEMON", "CHUCKY"] }
+    ];
+
+    let faseAtual = 1;
+    let palavrasFase = [];
+    let palavrasEncontradas = [];
+    let matriz = [];
+    let isMouseDown = false;
+    let selectedCells = [];
+    let tempoRestante = 600;
+    let timerInterval;
+    const GRID_SIZE = 14;
+
+    function iniciarTemporizador() {
+      clearInterval(timerInterval);
+      tempoRestante = 600;
+      atualizarDisplayTimer();
+
+      timerInterval = setInterval(() => {
+        tempoRestante--;
+        atualizarDisplayTimer();
+
+        // Se o tempo acabar e faltar qualquer palavra, o jogo volta para o começo
+        if (tempoRestante <= 0) {
+          clearInterval(timerInterval);
+          if (palavrasEncontradas.length < palavrasFase.length) {
+            alert("O tempo acabou e você não encontrou todas as palavras! O jogo voltará para a Rodada 1.");
+            faseAtual = 1;
+            iniciarFase();
+          }
+        }
+      }, 1000);
+    }
+
+    function atualizarDisplayTimer() {
+      const minutos = Math.floor(tempoRestante / 60);
+      const segundos = tempoRestante % 60;
+      document.getElementById('timer').textContent = `${minutos}:${segundos < 10 ? '0' : ''}${segundos}`;
+    }
+
+    function iniciarFase() {
+      palavrasEncontradas = [];
+      selectedCells = [];
+      document.getElementById('fase-num').textContent = faseAtual;
+      document.getElementById('message').textContent = "";
+
+      const dadosFase = bancoFases[faseAtual - 1];
+      document.getElementById('theme-display').textContent = "Tema: " + dadosFase.tema;
+      palavrasFase = dadosFase.palavras.map(p => p.replace(/\s+/g, '').toUpperCase());
+
+      const listEl = document.getElementById('word-list');
+      listEl.innerHTML = "";
+      dadosFase.palavras.forEach((nomeExibicao, idx) => {
+        const chave = palavrasFase[idx];
+        const li = document.createElement('li');
+        li.textContent = nomeExibicao;
+        li.id = `word-${chave}`;
+        listEl.appendChild(li);
+      });
+
+      gerarGrelha();
+      iniciarTemporizador();
+    }
+
+    const DIRECOES = [
+      { r: 0, c: 1 },   // Esquerda para Direita
+      { r: 0, c: -1 },  // Direita para Esquerda
+      { r: 1, c: 0 },   // Cima para Baixo
+      { r: -1, c: 0 },  // Baixo para Cima
+      { r: 1, c: 1 },   // Diagonal Baixo-Direita
+      { r: -1, c: -1 }, // Diagonal Cima-Esquerda
+      { r: 1, c: -1 },  // Diagonal Baixo-Esquerda
+      { r: -1, c: 1 }   // Diagonal Cima-Direita
+    ];
+
+    function tentarPosicionarPalavra(palavra) {
+      const direcoesEmbaralhadas = [...DIRECOES].sort(() => Math.random() - 0.5);
+      
+      for (let dir of direcoesEmbaralhadas) {
+        let linhasPossiveis = [];
+        let colunasPossiveis = [];
+        for (let i = 0; i < GRID_SIZE; i++) {
+          linhasPossiveis.push(i);
+          colunasPossiveis.push(i);
+        }
+        linhasPossiveis.sort(() => Math.random() - 0.5);
+        colunasPossiveis.sort(() => Math.random() - 0.5);
+
+        for (let r of linhasPossiveis) {
+          for (let c of colunasPossiveis) {
+            let cabe = true;
+            for (let k = 0; k < palavra.length; k++) {
+              let nr = r + dir.r * k;
+              let nc = c + dir.c * k;
+              if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) {
+                cabe = false;
+                break;
+              }
+              if (matriz[nr][nc] !== '' && matriz[nr][nc] !== palavra[k]) {
+                cabe = false;
+                break;
+              }
+            }
+
+            if (cabe) {
+              for (let k = 0; k < palavra.length; k++) {
+                let nr = r + dir.r * k;
+                let nc = c + dir.c * k;
+                matriz[nr][nc] = palavra[k];
+              }
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    }
+
+    function gerarGrelha() {
+      matriz = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(''));
+
+      palavrasFase.forEach(palavra => {
+        tentarPosicionarPalavra(palavra);
+      });
+
+      const alfabeto = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      for (let r = 0; r < GRID_SIZE; r++) {
+        for (let c = 0; c < GRID_SIZE; c++) {
+          if (matriz[r][c] === '') {
+            matriz[r][c] = alfabeto[Math.floor(Math.random() * alfabeto.length)];
+          }
+        }
+      }
+
+      desenharTabela();
+    }
+
+    function desenharTabela() {
+      const gridEl = document.getElementById('grid-container');
+      gridEl.innerHTML = "";
+      const table = document.createElement('table');
+
+      for (let r = 0; r < GRID_SIZE; r++) {
+        const tr = document.createElement('tr');
+        for (let c = 0; c < GRID_SIZE; c++) {
+          const td = document.createElement('td');
+          td.textContent = matriz[r][c];
+
+          td.addEventListener('mousedown', () => startSelection(td));
+          td.addEventListener('mouseenter', () => updateSelection(td));
+          td.addEventListener('mouseup', endSelection);
+
+          tr.appendChild(td);
+        }
+        table.appendChild(tr);
+      }
+      gridEl.appendChild(table);
+
+      document.addEventListener('mouseup', () => {
+        if (isMouseDown) endSelection();
+      });
+    }
+
+    function startSelection(cell) {
+      if (cell.classList.contains('found-cell')) return;
+      isMouseDown = true;
+      clearSelection();
+      selectedCells.push(cell);
+      cell.classList.add('selecting');
+    }
+
+    function updateSelection(cell) {
+      if (!isMouseDown || selectedCells.includes(cell) || cell.classList.contains('found-cell')) return;
+      selectedCells.push(cell);
+      cell.classList.add('selecting');
+    }
+
+    function endSelection() {
+      if (!isMouseDown) return;
+      isMouseDown = false;
+
+      const palavraFormada = selectedCells.map(c => c.textContent).join('');
+      const palavraInvertida = palavraFormada.split('').reverse().join('');
+
+      let palavraAchada = null;
+      if (palavrasFase.includes(palavraFormada) && !palavrasEncontradas.includes(palavraFormada)) {
+        palavraAchada = palavraFormada;
+      } else if (palavrasFase.includes(palavraInvertida) && !palavrasEncontradas.includes(palavraInvertida)) {
+        palavraAchada = palavraInvertida;
+      }
+
+      if (palavraAchada) {
+        palavrasEncontradas.push(palavraAchada);
+
+        const itemLi = document.getElementById(`word-${palavraAchada}`);
+        if (itemLi) itemLi.classList.add('found');
+
+        selectedCells.forEach(c => {
+          c.classList.remove('selecting');
+          c.classList.add('found-cell');
+        });
+
+        if (palavrasEncontradas.length === palavrasFase.length) {
+          document.getElementById('message').textContent = "Excelente! Completou a rodada!";
+          setTimeout(() => {
+            faseAtual++;
+            if (faseAtual > 15) {
+              faseAtual = 1;
+              alert("Parabéns! Você completou todas as 15 rodadas!");
+            }
+            iniciarFase();
+          }, 1200);
+        }
+      } else {
+        clearSelection();
+      }
+      selectedCells = [];
+    }
+
+    function clearSelection() {
+      document.querySelectorAll('td.selecting').forEach(c => c.classList.remove('selecting'));
+    }
+
+    iniciarFase();
+  </script>
+</body>
+</html>
